@@ -1,1 +1,77 @@
+############################################## Additional Columns #################################################
+
+Date = DATE(YEAR(CarPlateLogs[timestamp]), MONTH(CarPlateLogs[timestamp]), DAY(CarPlateLogs[timestamp]))
+---------------------------------------------------------------------------------------------------------
+Dwell Time (Hours) = 
+VAR EntryTime = 
+    CALCULATE(
+        MAX('CarPlateLogs'[timestamp]),
+        FILTER('CarPlateLogs', 
+            'CarPlateLogs'[cleaned_label] = EARLIER('CarPlateLogs'[cleaned_label]) &&
+            'CarPlateLogs'[direction] = "IN" &&
+            'CarPlateLogs'[timestamp] < EARLIER('CarPlateLogs'[timestamp])
+        )
+    )
+RETURN 
+    IF('CarPlateLogs'[direction] = "OUT",
+       DATEDIFF(EntryTime, 'CarPlateLogs'[timestamp], HOUR),
+       BLANK()
+    )
+---------------------------------------------------------------------------------------------------------
+Entry_Exit_Sequence = 
+RANKX(
+    FILTER(
+        'CarPlateLogs',
+        'CarPlateLogs'[cleaned_label] = EARLIER('CarPlateLogs'[cleaned_label])
+    ),
+    'CarPlateLogs'[timestamp],
+    ,
+    ASC,
+    DENSE
+)
+---------------------------------------------------------------------------------------------------------------
+
+###################################### METRICS ####################################################
+
+Daily IN Count = 
+CALCULATE(
+    DISTINCTCOUNT(CarPlateLogs[cleaned_label]),
+    CarPlateLogs[direction] = "IN"
+)
+
+----------------------------------------------------------------------------------
+
+Daily OUT Count = 
+CALCULATE(
+    DISTINCTCOUNT(CarPlateLogs[cleaned_label]),
+    CarPlateLogs[direction] = "OUT"
+)
+
+---------------------------------------------------------------------------------
+
+Daily Cars On Site = 
+VAR DailyIN = [Daily IN Count]
+VAR DailyOUT = [Daily OUT Count]
+RETURN
+   CALCULATE(
+      SUMX(
+         CarPlateLogs,
+         DailyIN - DailyOUT
+      ),
+      FILTER(
+         ALL(CarPlateLogs[Date]),
+         CarPlateLogs[Date] <= MAX(CarPlateLogs[Date])
+      )
+   )
+
+---------------------------------------------------------------------------------
+
+Average Dwell Time (Hours) = 
+AVERAGEX(
+    FILTER(
+        CarPlateLogs,
+        NOT(ISBLANK(CarPlateLogs[Dwell Time (Hours)]))
+    ),
+    CarPlateLogs[Dwell Time (Hours)]
+)
 
